@@ -56,7 +56,8 @@ def collect_keypoints(root_dir):
             keypoints = last_four_frames(video_path)
             if keypoints.size == 0:
                 continue
-            rows.extend(keypoints.tolist())
+            for coords in keypoints.tolist():
+                rows.append([folder, video] + coords)
     return rows
 
 
