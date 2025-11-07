@@ -11,13 +11,13 @@ pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5)
 def last_four_frames(video_path):
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    start_frame = max(total_frames - 4, 0)
+    start_frame = max(total_frames - 15, 0)
 
     keypoints = []
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-    for _ in range(4):
+    for _ in range(15):
         ret, frame = cap.read()
         if not ret:
             break
