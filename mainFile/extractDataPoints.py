@@ -17,6 +17,12 @@ class PoseTracker:
         self.coord_buffer = deque(maxlen = max_frames)
         self.frame_index = 0
         self.running = False
+        self._selected_landmarks = [
+            mp_pose.PoseLandmark.RIGHT_ELBOW,
+            mp_pose.PoseLandmark.RIGHT_WRIST,
+            mp_pose.PoseLandmark.LEFT_ELBOW,
+            mp_pose.PoseLandmark.LEFT_WRIST,
+        ]
 
     def process_frame(self, frame):
         self.frame_index += 1
@@ -28,17 +34,10 @@ class PoseTracker:
         landmarks_record = {"frame": self.frame_index, "landmarks": None}
 
         if results.pose_landmarks:
-            selected = [
-                mp_pose.PoseLandmark.RIGHT_ELBOW,
-                mp_pose.PoseLandmark.RIGHT_WRIST,
-                mp_pose.PoseLandmark.LEFT_ELBOW,
-                mp_pose.PoseLandmark.LEFT_WRIST,
-            ]
-
             h, w, _ = frame.shape
             coords = {}
 
-            for landmark_id in selected:
+            for landmark_id in self._selected_landmarks:
                 lm = results.pose_landmarks.landmark[landmark_id]
                 x, y = int(lm.x * w), int(lm.y * h)
                 coords[landmark_id.name] = {"x": x, "y": y}
@@ -59,6 +58,52 @@ class PoseTracker:
         frames = [torch.from_numpy(f).permute(2, 0, 1).float() / 255.0 for f in frames]
         frames_tensor = torch.stack(frames)  # [15, 3, H, W]
         return frames_tensor.unsqueeze(0)
+
+    def get_last_normalized_coords(self):
+        """Return landmark coordinates normalized like make_relative_per_landmark."""
+        if len(self.coord_buffer) == 0:
+            return []
+
+        ordered_names = [landmark.name for landmark in self._selected_landmarks]
+        frames = []
+        coord_rows = []
+
+        for record in self.coord_buffer:
+            landmarks = record.get("landmarks")
+            if not landmarks:
+                continue
+
+            try:
+                frame_coords = [[landmarks[name]["x"], landmarks[name]["y"]] for name in ordered_names]
+            except KeyError:
+                continue
+
+            frames.append(record["frame"])
+            coord_rows.append(frame_coords)
+
+        if not coord_rows:
+            return []
+
+        coords_array = np.array(coord_rows, dtype=np.float32)
+        relative = coords_array - coords_array[0]
+
+        distances = np.linalg.norm(relative, axis=2)
+        max_distance = float(distances.max()) if distances.size else 0.0
+
+        if max_distance > 0.0:
+            relative /= max_distance
+
+        normalized_records = []
+        for frame_index, points in zip(frames, relative):
+            normalized_records.append({
+                "frame": frame_index,
+                "landmarks": {
+                    name: {"x": float(coord[0]), "y": float(coord[1])}
+                    for name, coord in zip(ordered_names, points)
+                }
+            })
+
+        return normalized_records
         
     def run(self, get_frame_callable, poll_interval = 0.03):
         self.running = True
