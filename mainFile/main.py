@@ -6,10 +6,32 @@ from target_utils import respawn_target, wrists_hit_circle, choose_punch_type, P
 import time
 from extractDataPoints import PoseTracker
 import threading
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class Model(nn.Module):
+    def __init__(self, in_features=120, h1=128, h2=64, out_features=3):
+        super(Model, self).__init__()
+        self.fc1 = nn.Linear(in_features, h1)
+        self.fc2 = nn.Linear(h1, h2)
+        self.out = nn.Linear(h2, out_features)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.out(x)
+        return x
+
+
+
 
 tracker = PoseTracker(max_frames=15)
 
-
+model = Model()
+model.load_state_dict(torch.load("models/model_state.pt"))
+model.eval()
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -34,8 +56,11 @@ thread.start()
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
         ret, frame = cap.read()
+        if not ret or frame is None:
+            continue  # skip this iteration and try again
 
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
         image.flags.writeable = False
 
         results = pose.process(image)
@@ -76,7 +101,28 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         
         if collide:
             coords = tracker.get_last_fifteen_coords()
-            print(coords)
+            if coords:
+                # Flatten and normalize like in training
+                features = []
+                for record in coords:
+                    if record["landmarks"]:
+                        for key in record["landmarks"].values():
+                            features.extend([key["x"], key["y"]])
+                
+                # Convert to tensor
+                x = torch.tensor(features, dtype=torch.float32).unsqueeze(0)  # shape [1, 120]
+
+                # Make prediction
+                with torch.no_grad():
+                    output = model(x)
+                    pred_class = output.argmax(dim=1).item()  # get predicted class index
+
+                # Map prediction to punch type
+                punch_map = {0: "hook", 1: "jab", 2: "uppercut"}
+                predicted_punch = punch_map[pred_class]
+
+                print(f"Model Output: {output}")
+                print(f"Predicted Punch: {predicted_punch}")
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
             last_spawn_ts = time.time()

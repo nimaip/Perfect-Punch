@@ -3,6 +3,7 @@ import mediapipe as mp
 import numpy as np
 import threading
 import time
+import torch
 
 mp_pose = mp.solutions.pose
 
@@ -49,6 +50,15 @@ class PoseTracker:
 
     def get_last_fifteen_coords(self):
         return list(self.coord_buffer)
+    
+    def get_last_frames_tensor(self):
+        """Return the last 15 frames as a normalized PyTorch tensor [N,C,H,W]."""
+        if len(self.frame_buffer) == 0:
+            return None
+        frames = list(self.frame_buffer)
+        frames = [torch.from_numpy(f).permute(2, 0, 1).float() / 255.0 for f in frames]
+        frames_tensor = torch.stack(frames)  # [15, 3, H, W]
+        return frames_tensor.unsqueeze(0)
         
     def run(self, get_frame_callable, poll_interval = 0.03):
         self.running = True
