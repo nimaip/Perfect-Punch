@@ -100,7 +100,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             collide = wrists_hit_circle(landmarks, w, h, TARGET_CENTER, TARGET_RADIUS)
         
         if collide:
-            coords = tracker.get_last_fifteen_coords()
+            coords = tracker.get_last_normalized_coords()
             if coords:
                 # Flatten and normalize like in training
                 features = []
