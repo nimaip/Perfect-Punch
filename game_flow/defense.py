@@ -95,30 +95,6 @@ def check_collision(landmarks, w, h, square):
     hit_y_max = max(rs_y, nose_y) 
     # Y overlap: Square vertically intersects the shoulder-to-nose range
     y_intersects_zone = (square.y < hit_y_max) and (square.y + square.size > hit_y_min)
-    # if square.side == 'R':
-    #     # Square coming from RIGHT, expecting RIGHT arm block
-    #     if is_rw_colliding:
-    #         return 'Hit'
-    #     if is_lw_colliding:
-    #         return 'Block'
-    #     if CURRENT_SQUARE.x + CURRENT_SQUARE.size < (ls_x + rs_x) / 2: 
-    #         return 'Dodge'
-    # elif square.side == 'L':
-    #     # Square coming from LEFT, expecting LEFT arm block
-    #     if is_lw_colliding:
-    #         return 'Hit'
-    #     if is_rw_colliding:
-    #         return 'Block'
-    #     if CURRENT_SQUARE.x - CURRENT_SQUARE.size > (ls_x + rs_x) / 2: 
-    #         return 'Dodge'
-    # # --- 2. Body Collision Check (Lower Priority) ---
-    # # Check if any major body landmark (nose, shoulders, hips) is hit
-    # for point in BODY_POINTS:
-    #     px, py = get_coords(point.value)
-    #     if is_point_inside_square(px, py, square):
-    #         return 'Hit'
-            
-    # return None
     if square.side == 'R':
         # Square coming from RIGHT, expecting RIGHT arm block
         if is_rw_colliding or (CURRENT_SQUARE.x + CURRENT_SQUARE.size < (ls_x + rs_x) / 2 and y_intersects_zone):
