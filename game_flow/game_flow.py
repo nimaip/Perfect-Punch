@@ -27,7 +27,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
         h, w = image.shape[:2]
 
         try:
@@ -35,18 +34,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         except AttributeError:
             landmarks = None
 
-        elapsed = time.time() - start_time
-        remaining = max(0, int(MAX_RUNTIME - elapsed))
-        cv2.putText(
-            image,
-            f"Time: {remaining}s",
-            (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
 
         if TARGET_CENTER is None and landmarks is not None:
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
@@ -67,7 +54,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             color = PUNCH_COLORS.get(CURRENT_TYPE, (0, 0, 255))
             cv2.circle(image, TARGET_CENTER, TARGET_RADIUS, color, -1)
 
-        cv2.imshow("Mediapipe Feed (Press q to quit)", image)
+        cv2.imshow("Mediapipe Feed (Press q to quit)", cv2.flip(image,1))
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
