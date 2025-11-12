@@ -65,6 +65,8 @@ thread.start()
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
+        actual_fps = cap.get(cv2.CAP_PROP_FPS)
+        print(actual_fps)
         ret, frame = cap.read()
         if not ret or frame is None:
             continue  # skip this iteration and try again
