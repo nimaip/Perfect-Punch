@@ -10,7 +10,7 @@ mp_pose = mp.solutions.pose
 
 # Game Settings
 MAX_RUNTIME = 30  # seconds
-SQUARE_SIZE = 60
+SQUARE_SIZE = 40  # pixels
 SQUARE_SPEED = 7  # pixels per frame
 SQUARE_COLOR = (0, 255, 255) # Constant Grey color for the target
 BODY_POINTS = [mp_pose.PoseLandmark.LEFT_SHOULDER, mp_pose.PoseLandmark.RIGHT_SHOULDER,
@@ -76,49 +76,82 @@ def check_collision(landmarks, w, h, square):
     if square is None or landmarks is None:
         return None
 
-    # Helper function to get pixel coordinates from normalized landmark
-    def get_coords(landmark_id):
-        lm = landmarks[landmark_id]
+    # Helper: takes either enum or raw index
+    def get_coords(lm_enum_or_index):
+        if isinstance(lm_enum_or_index, int):
+            lm = landmarks[lm_enum_or_index]
+        else:
+            lm = landmarks[lm_enum_or_index.value]
         return int(lm.x * w), int(lm.y * h)
 
-    # Get Wrist Coordinates
+    # --- Key joints ---
+    # Arms
     rw_x, rw_y = get_coords(mp_pose.PoseLandmark.RIGHT_WRIST)
     lw_x, lw_y = get_coords(mp_pose.PoseLandmark.LEFT_WRIST)
-    ls_x, ls_y = get_coords(mp_pose.PoseLandmark.LEFT_SHOULDER)
+    re_x, re_y = get_coords(mp_pose.PoseLandmark.RIGHT_ELBOW)
+    le_x, le_y = get_coords(mp_pose.PoseLandmark.LEFT_ELBOW)
     rs_x, rs_y = get_coords(mp_pose.PoseLandmark.RIGHT_SHOULDER)
+    ls_x, ls_y = get_coords(mp_pose.PoseLandmark.LEFT_SHOULDER)
+
+    # Torso / head
+    lh_x, lh_y = get_coords(mp_pose.PoseLandmark.LEFT_HIP)
+    rh_x, rh_y = get_coords(mp_pose.PoseLandmark.RIGHT_HIP)
     nose_x, nose_y = get_coords(mp_pose.PoseLandmark.NOSE)
-    # --- 1. Arm Collision Checks (Highest Priority) ---
-    is_rw_colliding = is_point_inside_square(rw_x, rw_y, square)
-    is_lw_colliding = is_point_inside_square(lw_x, lw_y, square)
+
+    # Square rect
+    sq_x1 = square.x
+    sq_y1 = square.y
+    sq_x2 = square.x + square.size
+    sq_y2 = square.y + square.size
+
+    def rects_overlap(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2):
+        return not (ax2 < bx1 or ax1 > bx2 or ay2 < by1 or ay1 > by2)
+
+    # --- 1. BLOCK: overlap with either arm rectangle ---
+    ARM_PADDING = 20  # makes the arm "thicker"
+
+    # Right arm rectangle (shoulder–elbow–wrist)
+    r_arm_x1 = min(rs_x, re_x, rw_x) - ARM_PADDING
+    r_arm_x2 = max(rs_x, re_x, rw_x) + ARM_PADDING
+    r_arm_y1 = min(rs_y, re_y, rw_y) - ARM_PADDING
+    r_arm_y2 = max(rs_y, re_y, rw_y) + ARM_PADDING
+
+    # Left arm rectangle
+    l_arm_x1 = min(ls_x, le_x, lw_x) - ARM_PADDING
+    l_arm_x2 = max(ls_x, le_x, lw_x) + ARM_PADDING
+    l_arm_y1 = min(ls_y, le_y, lw_y) - ARM_PADDING
+    l_arm_y2 = max(ls_y, le_y, lw_y) + ARM_PADDING
+
+    if (rects_overlap(sq_x1, sq_y1, sq_x2, sq_y2,
+                      r_arm_x1, r_arm_y1, r_arm_x2, r_arm_y2) or
+        rects_overlap(sq_x1, sq_y1, sq_x2, sq_y2,
+                      l_arm_x1, l_arm_y1, l_arm_x2, l_arm_y2)):
+        return 'Block'
+
+    # --- 2. HIT: square overlaps torso/head region ---
+    torso_x1 = min(ls_x, rs_x, lh_x, rh_x)
+    torso_x2 = max(ls_x, rs_x, lh_x, rh_x)
+    torso_y1 = min(ls_y, rs_y, lh_y, rh_y, nose_y)
+    torso_y2 = max(ls_y, rs_y, lh_y, rh_y, nose_y)
+
+    overlap_x = not (sq_x2 < torso_x1 or sq_x1 > torso_x2)
+    overlap_y = not (sq_y2 < torso_y1 or sq_y1 > torso_y2)
+
+    if overlap_x and overlap_y:
+        return 'Hit'
+
+    # --- 3. DODGE: passed center line without hitting anything ---
     center_x = (ls_x + rs_x) / 2
-    hit_y_min = min(rs_y, nose_y) 
-    hit_y_max = max(rs_y, nose_y) 
-    # Y overlap: Square vertically intersects the shoulder-to-nose range
-    y_intersects_zone = (square.y < hit_y_max) and (square.y + square.size > hit_y_min)
+
     if square.side == 'R':
-        # Square coming from RIGHT, expecting RIGHT arm block
-        if is_rw_colliding or (CURRENT_SQUARE.x + CURRENT_SQUARE.size < (ls_x + rs_x) / 2 and y_intersects_zone):
-            return 'Hit'
-        if is_lw_colliding: #or square.x < center_x and square.x + square.size < center_x:
-            return 'Block'
-        if CURRENT_SQUARE.x + CURRENT_SQUARE.size < (ls_x + rs_x) / 2: 
+        # Coming from the right: once its right edge is left of your center
+        if sq_x2 < center_x:
             return 'Dodge'
-    
-    elif square.side == 'L':
-        # Square coming from LEFT, expecting LEFT arm block
-        if is_lw_colliding or ((CURRENT_SQUARE.x - CURRENT_SQUARE.size > (ls_x + rs_x) / 2) and y_intersects_zone):
-            return 'Hit'
-        if is_rw_colliding: #or ((CURRENT_SQUARE.size > (ls_x + rs_x) / 2) and rs_y <= CURRENT_SQUARE.y <= nose_y):
-            return 'Block'
-        if CURRENT_SQUARE.x - CURRENT_SQUARE.size > (ls_x + rs_x) / 2: 
+    else:  # 'L'
+        # Coming from the left: once its left edge is right of your center
+        if sq_x1 > center_x:
             return 'Dodge'
-    # --- 2. Body Collision Check (Lower Priority) ---
-    # Check if any major body landmark (nose, shoulders, hips) is hit
-    for point in BODY_POINTS:
-        px, py = get_coords(point.value)
-        if is_point_inside_square(px, py, square):
-            return 'Hit'
-            
+
     return None
 
 # --- MAIN GAME LOOP ---
@@ -146,7 +179,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
         # Draw Landmarks
         mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-        
         try:
             landmarks = results.pose_landmarks.landmark
         except AttributeError:
@@ -167,23 +199,27 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 
                 # Check for collision
                 collision_result = check_collision(landmarks, w, h, CURRENT_SQUARE)
+            
 
                 if collision_result == 'Block':
                     numBlocked += 1  # Successfully blocked
                     spawn_buffer = random.randint(3, 7)
                     despawn_time = time.time()
+                    print("REGISTERED: Block")
                     CURRENT_SQUARE = None  # Respawn on successful block
                 
                 elif collision_result == 'Hit':
                     numLanded += 1   # Square landed on wrong arm/body
                     spawn_buffer = random.randint(3, 7)
                     despawn_time = time.time()
+                    print("REGISTERED: Hit")
                     CURRENT_SQUARE = None # Respawn on hit
                 # Check if the square missed (went off screen)
                 elif (collision_result == 'Dodge'):
                     numDodged += 1   # Square missed (dodged/missed block)
                     spawn_buffer = random.randint(3, 7) #change back to 3, 7 when done
                     despawn_time = time.time()
+                    print("REGISTERED: Dodge")
                     CURRENT_SQUARE = None # Respawn on miss
                 print()
 
