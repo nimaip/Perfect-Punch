@@ -31,13 +31,20 @@ def respawn_target(landmarks, w, h, target_radius):
     xmin = max(target_radius, min(lsx, rsx) - shoulder_width)
     xmax = min(w - target_radius, max(lsx, rsx) + shoulder_width)
 
-    waist_y = (lhy + rhy) // 2
-    ymin = max(target_radius, min(ny, waist_y))
-    ymax = min(h - target_radius, max(ny, waist_y))
+    shoulder_mid_y = (lsy + rsy) // 2
+    waist_y        = (lhy + rhy) // 2
 
-    if xmax <= xmin or ymax <= ymin:
+    # Lower y boundary is halfway between shoulders and waist
+    mid_y = (shoulder_mid_y + waist_y) // 2
+
+    upper = min(ny, mid_y)   # higher on screen (nose side)
+    lower = max(ny, mid_y)   # lower on screen (closer to waist)
+
+    ymin = max(target_radius, upper)
+    ymax = min(h - target_radius, lower)
+
+    if ymax <= ymin:
         return None
-
     return (random.randint(xmin, xmax), random.randint(ymin, ymax))
 
 #Detect if either wrist is within the target circle
