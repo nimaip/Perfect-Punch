@@ -46,7 +46,14 @@ def wrists_hit_circle(landmarks, w, h, center, radius):
         return False
     cx, cy = center
     for wid in (mp_pose.PoseLandmark.LEFT_WRIST.value,
-                mp_pose.PoseLandmark.RIGHT_WRIST.value):
+                mp_pose.PoseLandmark.RIGHT_WRIST.value,
+                mp_pose.PoseLandmark.RIGHT_PINKY.value,
+                mp_pose.PoseLandmark.LEFT_PINKY.value,
+                mp_pose.PoseLandmark.RIGHT_INDEX.value,
+                mp_pose.PoseLandmark.LEFT_INDEX.value,
+                mp_pose.PoseLandmark.RIGHT_THUMB.value,
+                mp_pose.PoseLandmark.LEFT_THUMB.value,
+                ):
         lm = landmarks[wid]
         if lm.visibility < 0.5:
             continue

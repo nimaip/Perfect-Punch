@@ -9,7 +9,7 @@ import threading
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import math
 
 class Model(nn.Module):
     def __init__(self, in_features=120, h1=128, h2=64, out_features=3):
@@ -37,9 +37,19 @@ mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 TARGET_CENTER = None
 TARGET_RADIUS = 25 
-SPAWN_PROTECT_S = 0.5
+SPAWN_PROTECT_S = 1
 last_spawn_ts = 0.0
+circle_spawn_ts = None
+protect_release_ts = None
 MAX_RUNTIME = 30
+
+reaction_time_punch = {"jab": [], "hook": [], "uppercut": []}
+
+speed_jab = []
+speed_hook = []
+speed_uppercut = []
+correct_punches_thrown = 0
+punches_thrown = 0
 
 start_time = time.time()
 cap = cv2.VideoCapture(0)
@@ -76,30 +86,24 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         except AttributeError:
             landmarks = None
 
-        elapsed = time.time() - start_time
-        remaining = max(0, int(MAX_RUNTIME - elapsed))
-        cv2.putText(
-            image,
-            f"Time: {remaining}s",
-            (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
+        
 
         if TARGET_CENTER is None and landmarks is not None:
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
             last_spawn_ts = time.time()
+            circle_spawn_ts = last_spawn_ts
+            protect_release_ts = circle_spawn_ts + SPAWN_PROTECT_S
 
         collide = False
-        protecting = (time.time() - last_spawn_ts) < SPAWN_PROTECT_S
+        protecting = protect_release_ts is not None and time.time() < protect_release_ts
         if landmarks is not None and TARGET_CENTER is not None and not protecting:
             collide = wrists_hit_circle(landmarks, w, h, TARGET_CENTER, TARGET_RADIUS)
         
-        if collide:
+        if not protecting and collide:
+            reference_time = circle_spawn_ts if circle_spawn_ts is not None else protect_release_ts
+            reaction_time = time.time() - reference_time
+            reaction_time_punch[CURRENT_TYPE].append(reaction_time)
             coords = tracker.get_last_normalized_coords()
             if coords:
                 # Flatten and normalize like in training
@@ -120,12 +124,18 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 # Map prediction to punch type
                 punch_map = {0: "hook", 1: "jab", 2: "uppercut"}
                 predicted_punch = punch_map[pred_class]
-
+                if predicted_punch == CURRENT_TYPE:
+                    correct_punches_thrown += 1
+                punches_thrown += 1
+                    
                 print(f"Model Output: {output}")
                 print(f"Predicted Punch: {predicted_punch}")
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
+            print(CURRENT_TYPE, "<-----")
             last_spawn_ts = time.time()
+            circle_spawn_ts = last_spawn_ts
+            protect_release_ts = circle_spawn_ts + SPAWN_PROTECT_S
         
         if TARGET_CENTER is not None and CURRENT_TYPE is not None:
             color = PUNCH_COLORS.get(CURRENT_TYPE, (0, 0, 255))
@@ -137,6 +147,11 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             break
         if time.time() - start_time >= MAX_RUNTIME:
             break
-
+for i in reaction_time_punch:
+    reaction_time_punch[i] = sum(reaction_time_punch[i]) / len(reaction_time_punch[i])
+    print("Reaction time:", i, reaction_time_punch[i])
+print(punches_thrown)
+print((correct_punches_thrown/punches_thrown * 100), "% punches correctly thrown")
 cap.release()
 cv2.destroyAllWindows()
+quit()
