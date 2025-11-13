@@ -1,7 +1,5 @@
 import cv2
 import mediapipe as mp
-import numpy as np
-import random
 from target_utils import respawn_target, wrists_hit_circle, choose_punch_type, PUNCH_COLORS
 import time
 from extractDataPoints import PoseTracker
@@ -12,6 +10,7 @@ import torch.nn.functional as F
 import json
 from datetime import datetime
 import math
+from defense import DefenseGame
 
 class Model(nn.Module):
     def __init__(self, in_features=120, h1=128, h2=64, out_features=3):
@@ -64,8 +63,126 @@ speed_windows = [
     {k: [] for k in reaction_time_punch.keys()},
 ]
 speed_window_combined = [[] for _ in range(3)]
-attempts_by_type = {k: 0 for k in reaction_time_punch.keys()}
-correct_by_type = {k: 0 for k in reaction_time_punch.keys()}
+coverage_tracker = {
+    "head": {"covered": 0, "total": 0},
+    "body": {"covered": 0, "total": 0},
+}
+exposure_tracker = {
+    "left_shoulder": {"covered": 0, "total": 0},
+    "right_shoulder": {"covered": 0, "total": 0},
+    "chest": {"covered": 0, "total": 0},
+    "abdomen": {"covered": 0, "total": 0},
+    "hips": {"covered": 0, "total": 0},
+}
+defense_game = DefenseGame()
+
+
+def _rects_overlap(a_x1, a_y1, a_x2, a_y2, b_x1, b_y1, b_x2, b_y2):
+    return not (a_x2 < b_x1 or a_x1 > b_x2 or a_y2 < b_y1 or a_y1 > b_y2)
+
+
+def _clamp_rect(x1, y1, x2, y2, max_w, max_h):
+    return (
+        max(0, min(x1, max_w)),
+        max(0, min(y1, max_h)),
+        max(0, min(x2, max_w)),
+        max(0, min(y2, max_h)),
+    )
+
+
+def update_coverage_metrics(landmarks, w, h):
+    if landmarks is None:
+        return
+
+    def get_coords(lm_enum_or_index):
+        if isinstance(lm_enum_or_index, int):
+            lm = landmarks[lm_enum_or_index]
+        else:
+            lm = landmarks[lm_enum_or_index.value]
+        return int(lm.x * w), int(lm.y * h)
+
+    rw_x, rw_y = get_coords(mp_pose.PoseLandmark.RIGHT_WRIST)
+    lw_x, lw_y = get_coords(mp_pose.PoseLandmark.LEFT_WRIST)
+    re_x, re_y = get_coords(mp_pose.PoseLandmark.RIGHT_ELBOW)
+    le_x, le_y = get_coords(mp_pose.PoseLandmark.LEFT_ELBOW)
+    rs_x, rs_y = get_coords(mp_pose.PoseLandmark.RIGHT_SHOULDER)
+    ls_x, ls_y = get_coords(mp_pose.PoseLandmark.LEFT_SHOULDER)
+    lh_x, lh_y = get_coords(mp_pose.PoseLandmark.LEFT_HIP)
+    rh_x, rh_y = get_coords(mp_pose.PoseLandmark.RIGHT_HIP)
+    nose_x, nose_y = get_coords(mp_pose.PoseLandmark.NOSE)
+
+    arm_padding = 20
+    right_arm_rect = _clamp_rect(
+        min(rs_x, re_x, rw_x) - arm_padding,
+        min(rs_y, re_y, rw_y) - arm_padding,
+        max(rs_x, re_x, rw_x) + arm_padding,
+        max(rs_y, re_y, rw_y) + arm_padding,
+        w,
+        h,
+    )
+    left_arm_rect = _clamp_rect(
+        min(ls_x, le_x, lw_x) - arm_padding,
+        min(ls_y, le_y, lw_y) - arm_padding,
+        max(ls_x, le_x, lw_x) + arm_padding,
+        max(ls_y, le_y, lw_y) + arm_padding,
+        w,
+        h,
+    )
+
+    def is_region_guarded(region_rect):
+        x1, y1, x2, y2 = region_rect
+        return (
+            _rects_overlap(x1, y1, x2, y2, *right_arm_rect)
+            or _rects_overlap(x1, y1, x2, y2, *left_arm_rect)
+        )
+
+    head_padding = 30
+    head_rect = _clamp_rect(
+        min(ls_x, rs_x) - head_padding,
+        min(nose_y, ls_y, rs_y) - head_padding,
+        max(ls_x, rs_x) + head_padding,
+        max(nose_y, ls_y, rs_y) + head_padding,
+        w,
+        h,
+    )
+    coverage_tracker["head"]["total"] += 1
+    if is_region_guarded(head_rect):
+        coverage_tracker["head"]["covered"] += 1
+
+    body_padding = 25
+    body_rect = _clamp_rect(
+        min(ls_x, rs_x, lh_x, rh_x) - body_padding,
+        min(ls_y, rs_y) - body_padding,
+        max(ls_x, rs_x, lh_x, rh_x) + body_padding,
+        max(lh_y, rh_y) + body_padding,
+        w,
+        h,
+    )
+    coverage_tracker["body"]["total"] += 1
+    if is_region_guarded(body_rect):
+        coverage_tracker["body"]["covered"] += 1
+
+    area_half = 45
+    area_definitions = {
+        "left_shoulder": (ls_x, ls_y),
+        "right_shoulder": (rs_x, rs_y),
+        "chest": ((ls_x + rs_x) // 2, (ls_y + rs_y) // 2),
+        "abdomen": ((lh_x + rh_x) // 2, (lh_y + rh_y) // 2),
+        "hips": ((lh_x + rh_x) // 2, max(lh_y, rh_y)),
+    }
+
+    for area_key, (cx, cy) in area_definitions.items():
+        area_rect = _clamp_rect(
+            cx - area_half,
+            cy - area_half,
+            cx + area_half,
+            cy + area_half,
+            w,
+            h,
+        )
+        exposure_tracker[area_key]["total"] += 1
+        if is_region_guarded(area_rect):
+            exposure_tracker[area_key]["covered"] += 1
 
 start_time = time.time()
 cap = cv2.VideoCapture(0)
@@ -98,6 +215,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+        mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
         h, w = image.shape[:2]
 
         try:
@@ -204,7 +322,11 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             color = PUNCH_COLORS.get(CURRENT_TYPE, (0, 0, 255))
             cv2.circle(image, TARGET_CENTER, TARGET_RADIUS, color, -1)
 
-        cv2.imshow("Mediapipe Feed (Press q to quit)", cv2.flip(image,1))
+        defense_game.update(image, landmarks, now)
+        defense_stats = defense_game.get_stats()
+
+        display_image = cv2.flip(image, 1)
+        cv2.imshow("Mediapipe Feed (Press q to quit)", display_image)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
@@ -296,6 +418,37 @@ speed_segments = {
     "final_third": speed_all_points[2],
 }
 
+defense_totals = defense_game.get_stats()
+defense_total_events = sum(defense_totals.values())
+if defense_total_events:
+    punches_avoided_percent = round_or_none(
+        ((defense_totals["blocked"] + defense_totals["dodged"]) / defense_total_events) * 100
+    )
+else:
+    punches_avoided_percent = None
+
+critical_hit_percentages = {}
+for area_key, stats in coverage_tracker.items():
+    if stats["total"]:
+        uncovered_pct = ((stats["total"] - stats["covered"]) / stats["total"]) * 100
+        critical_hit_percentages[area_key] = round_or_none(uncovered_pct)
+    else:
+        critical_hit_percentages[area_key] = None
+
+exposure_weights_values = {}
+for area_key, stats in exposure_tracker.items():
+    if stats["total"]:
+        exposed_ratio = (stats["total"] - stats["covered"]) / stats["total"]
+        exposure_weights_values[area_key] = round_or_none(exposed_ratio)
+    else:
+        exposure_weights_values[area_key] = None
+
+endurance_segments = {
+    "first_third": round_or_none(window_accuracy_points[0]) if len(window_accuracy_points) > 0 else None,
+    "second_third": round_or_none(window_accuracy_points[1]) if len(window_accuracy_points) > 1 else None,
+    "final_third": round_or_none(window_accuracy_points[2]) if len(window_accuracy_points) > 2 else None,
+}
+
 fighter_id = "fighter_sample_001"
 session_id = f"session_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
 timestamp_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -345,6 +498,37 @@ session_payload = [{
                     }
                 }
             }
+        },
+        "defense": {
+            "critical_hit_opportunities": {
+                "unit": "% of body",
+                "areas": {
+                    "head": critical_hit_percentages.get("head"),
+                    "body": critical_hit_percentages.get("body"),
+                }
+            },
+            "exposure_weights": {
+                "unit": "relative_weight_0_to_1",
+                "description": "Relative weighting (0–1) showing how exposed each body area was across all sampled frames.",
+                "areas": exposure_weights_values,
+            },
+            "endurance": {
+                "unit": "%",
+                "description": "Average accuracy over each third of the session, representing endurance and fatigue levels.",
+                "segments": endurance_segments,
+            },
+            "punches_avoided": {
+                "unit": "%",
+                "value": punches_avoided_percent,
+                "description": "Percentage of incoming targets that were blocked or dodged."
+            }
+        },
+        "miscellaneous": {
+            "flying_blocks_summary": {
+                "unit": "count",
+                "values": defense_totals,
+                "description": "Counts of block, dodge, and hit outcomes from the flying blocks drill."
+            }
         }
     }
 }]
@@ -353,7 +537,16 @@ with open("session_metrics.json", "w", encoding="utf-8") as metric_file:
     json.dump(session_payload, metric_file, indent=2)
 
 print("Session metrics written to session_metrics.json")
+print(
+    "Defense stats - Blocked: {blocked}, Dodged: {dodged}, Hit: {hit}".format(
+        blocked=defense_totals["blocked"],
+        dodged=defense_totals["dodged"],
+        hit=defense_totals["hit"],
+    )
+)
 
+tracker.stop()
+thread.join(timeout=1.0)
 cap.release()
 cv2.destroyAllWindows()
 quit()
