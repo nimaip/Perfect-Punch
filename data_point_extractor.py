@@ -33,9 +33,9 @@ def last_four_frames(video_path):
                 landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value],
                 landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value],
             ]
-            coords = np.array([[j.x, j.y] for j in joints]).flatten()
+            coords = np.array([[j.x, j.y, -j.z] for j in joints]).flatten()
         else:
-            coords = np.zeros(8)
+            coords = np.zeros(12)
 
         keypoints.append(coords)
 
