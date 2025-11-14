@@ -65,15 +65,19 @@ def last_four_frames(video_path):
 
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
-            joints = [
-                landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value],
-                landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value],
-                landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value],
-                landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value],
-            ]
+            if "left" in video_path.lower():
+                joints = [
+                    landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value],
+                    landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value],
+                ]            
+            elif "right" in video_path.lower():
+                joints = [
+                        landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value],
+                        landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value],
+                    ]
             coords = np.array([[j.x, j.y, j.z] for j in joints]).flatten()
         else:
-            coords = np.zeros(12)
+            coords = np.zeros(6)
 
         keypoints.append(coords)
 
