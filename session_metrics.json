@@ -1,24 +1,24 @@
 [
   {
     "fighter_id": "fighter_sample_001",
-    "session_id": "session_20251113_194339",
-    "timestamp": "2025-11-13T19:43:39Z",
+    "session_id": "session_20251115_010558",
+    "timestamp": "2025-11-15T01:05:58Z",
     "metrics": {
       "offense": {
         "punch_accuracy": {
           "unit": "%",
           "types": {
-            "jab": 0.0,
-            "hook": 0.0,
+            "jab": null,
+            "hook": null,
             "uppercut": null
           },
           "derived": {
-            "average": 0.0,
+            "average": null,
             "average_description": "Average of all recorded punch accuracies across the session.",
-            "best": 0.0,
-            "worst": 0.0,
+            "best": null,
+            "worst": null,
             "all_points": [
-              0.0,
+              null,
               null,
               null
             ]
@@ -27,17 +27,17 @@
         "punch_reaction_time": {
           "unit": "ms",
           "types": {
-            "jab": 3390.65,
-            "hook": 1097.45,
+            "jab": null,
+            "hook": null,
             "uppercut": null
           },
           "derived": {
-            "average": 2244.05,
+            "average": null,
             "average_description": "Average reaction time, in milliseconds, measured across all punches.",
-            "best": 1097.45,
-            "worst": 3390.65,
+            "best": null,
+            "worst": null,
             "all_points": [
-              2244.05,
+              null,
               null,
               null
             ],
@@ -47,24 +47,24 @@
         "punch_speed": {
           "unit": "px/s",
           "types": {
-            "jab": 846.24,
-            "hook": 102.31,
+            "jab": null,
+            "hook": null,
             "uppercut": null
           },
           "derived": {
-            "average": 474.27,
+            "average": null,
             "average_description": "Mean punch speed across all punch types during the session.",
-            "best": 846.24,
-            "worst": 102.31,
+            "best": null,
+            "worst": null,
             "all_points": [
-              474.27,
+              null,
               null,
               null
             ],
             "combo_tempo": {
               "unit": "px/s",
               "segments": {
-                "first_third": 474.27,
+                "first_third": null,
                 "second_third": null,
                 "final_third": null
               },
@@ -74,19 +74,48 @@
         }
       },
       "defense": {
-        "flying_blocks": {
-          "unit": "count",
-          "events": {
-            "blocked": 0,
-            "dodged": 0,
-            "hit": 1
-          },
-          "description": "Counts of block, dodge, and hit outcomes from the flying blocks drill."
+        "critical_hit_opportunities": {
+          "unit": "% of body",
+          "areas": {
+            "head": null,
+            "body": null
+          }
+        },
+        "exposure_weights": {
+          "unit": "relative_weight_0_to_1",
+          "description": "Relative weighting (0\u20131) showing how exposed each body area was across all sampled frames.",
+          "areas": {
+            "left_shoulder": null,
+            "right_shoulder": null,
+            "chest": null,
+            "abdomen": null,
+            "hips": null
+          }
+        },
+        "endurance": {
+          "unit": "%",
+          "description": "Average accuracy over each third of the session, representing endurance and fatigue levels.",
+          "segments": {
+            "first_third": null,
+            "second_third": null,
+            "final_third": null
+          }
         },
         "punches_avoided": {
           "unit": "%",
-          "value": 0.0,
+          "value": null,
           "description": "Percentage of incoming targets that were blocked or dodged."
+        }
+      },
+      "miscellaneous": {
+        "flying_blocks_summary": {
+          "unit": "count",
+          "values": {
+            "blocked": 0,
+            "dodged": 0,
+            "hit": 0
+          },
+          "description": "Counts of block, dodge, and hit outcomes from the flying blocks drill."
         }
       }
     }

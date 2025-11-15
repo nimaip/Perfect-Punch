@@ -280,37 +280,33 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                                 speed_window_combined[window_idx].append(speed_value)
 
             coords = tracker.get_last_normalized_coords()
-            if coords:
+            if coords and len(coords) >= 15:
                 # Flatten and normalize like in training
                 features = []
                 for record in coords:
                     if record["landmarks"]:
                         for key in record["landmarks"].values():
                             features.extend([key["x"], key["y"]])
-                
-                # Convert to tensor
-                x = torch.tensor(features, dtype=torch.float32).unsqueeze(0)  # shape [1, 120]
+                if len(features) == 120:
+                    x = torch.tensor(features, dtype=torch.float32).unsqueeze(0)  # shape [1, 120]
+                    with torch.no_grad():
+                        output = model(x)
+                        pred_class = output.argmax(dim=1).item()
 
-                # Make prediction
-                with torch.no_grad():
-                    output = model(x)
-                    pred_class = output.argmax(dim=1).item()  # get predicted class index
-
-                # Map prediction to punch type
-                punch_map = {0: "hook", 1: "jab", 2: "uppercut"}
-                predicted_punch = punch_map[pred_class]
-                attempts_by_type[CURRENT_TYPE] += 1
-                punches_thrown += 1
-                if window_idx is not None:
-                    accuracy_windows[window_idx]["attempts"] += 1
-                if predicted_punch == CURRENT_TYPE:
-                    correct_punches_thrown += 1
-                    correct_by_type[CURRENT_TYPE] += 1
+                    punch_map = {0: "hook", 1: "jab", 2: "uppercut"}
+                    predicted_punch = punch_map[pred_class]
+                    attempts_by_type[CURRENT_TYPE] += 1
+                    punches_thrown += 1
                     if window_idx is not None:
-                        accuracy_windows[window_idx]["correct"] += 1
-                    
-                print(f"Model Output: {output}")
-                print(f"Predicted Punch: {predicted_punch}")
+                        accuracy_windows[window_idx]["attempts"] += 1
+                    if predicted_punch == CURRENT_TYPE:
+                        correct_punches_thrown += 1
+                        correct_by_type[CURRENT_TYPE] += 1
+                        if window_idx is not None:
+                            accuracy_windows[window_idx]["correct"] += 1
+
+                    print(f"Model Output: {output}")
+                    print(f"Predicted Punch: {predicted_punch}")
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
             print(CURRENT_TYPE, "<-----")
