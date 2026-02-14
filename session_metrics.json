@@ -1,45 +1,45 @@
 [
   {
     "fighter_id": "fighter_sample_001",
-    "session_id": "session_20251115_010558",
-    "timestamp": "2025-11-15T01:05:58Z",
+    "session_id": "session_20260206_014531",
+    "timestamp": "2026-02-06T01:45:31Z",
     "metrics": {
       "offense": {
         "punch_accuracy": {
           "unit": "%",
           "types": {
-            "jab": null,
-            "hook": null,
-            "uppercut": null
+            "jab": 11.11,
+            "hook": 0.0,
+            "uppercut": 0.0
           },
           "derived": {
-            "average": null,
+            "average": 7.69,
             "average_description": "Average of all recorded punch accuracies across the session.",
-            "best": null,
-            "worst": null,
+            "best": 16.67,
+            "worst": 0.0,
             "all_points": [
-              null,
-              null,
-              null
+              0.0,
+              0.0,
+              16.67
             ]
           }
         },
         "punch_reaction_time": {
           "unit": "ms",
           "types": {
-            "jab": null,
-            "hook": null,
-            "uppercut": null
+            "jab": 1685.9,
+            "hook": 1850.94,
+            "uppercut": 3554.69
           },
           "derived": {
-            "average": null,
+            "average": 1998.8,
             "average_description": "Average reaction time, in milliseconds, measured across all punches.",
-            "best": null,
-            "worst": null,
+            "best": 1093.4,
+            "worst": 5321.61,
             "all_points": [
-              null,
-              null,
-              null
+              2155.06,
+              2255.31,
+              1716.25
             ],
             "all_points_description": "Reaction time averages for each 10-second segment of the session."
           }
@@ -47,26 +47,26 @@
         "punch_speed": {
           "unit": "px/s",
           "types": {
-            "jab": null,
-            "hook": null,
-            "uppercut": null
+            "jab": 396.22,
+            "hook": 394.21,
+            "uppercut": 332.29
           },
           "derived": {
-            "average": null,
+            "average": 386.07,
             "average_description": "Mean punch speed across all punch types during the session.",
-            "best": null,
-            "worst": null,
+            "best": 835.62,
+            "worst": 174.2,
             "all_points": [
-              null,
-              null,
-              null
+              835.62,
+              318.45,
+              378.78
             ],
             "combo_tempo": {
               "unit": "px/s",
               "segments": {
-                "first_third": null,
-                "second_third": null,
-                "final_third": null
+                "first_third": 835.62,
+                "second_third": 318.45,
+                "final_third": 378.78
               },
               "description": "Average punch speed per 10-second segment of the session."
             }
@@ -96,14 +96,14 @@
           "unit": "%",
           "description": "Average accuracy over each third of the session, representing endurance and fatigue levels.",
           "segments": {
-            "first_third": null,
-            "second_third": null,
-            "final_third": null
+            "first_third": 0.0,
+            "second_third": 0.0,
+            "final_third": 16.67
           }
         },
         "punches_avoided": {
           "unit": "%",
-          "value": null,
+          "value": 66.67,
           "description": "Percentage of incoming targets that were blocked or dodged."
         }
       },
@@ -111,9 +111,9 @@
         "flying_blocks_summary": {
           "unit": "count",
           "values": {
-            "blocked": 0,
-            "dodged": 0,
-            "hit": 0
+            "blocked": 1,
+            "dodged": 1,
+            "hit": 1
           },
           "description": "Counts of block, dodge, and hit outcomes from the flying blocks drill."
         }

@@ -228,6 +228,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         if TARGET_CENTER is None and landmarks is not None:
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
+            print(CURRENT_TYPE)
             last_spawn_ts = now
             circle_spawn_ts = last_spawn_ts
             protect_release_ts = circle_spawn_ts + SPAWN_PROTECT_S
@@ -310,6 +311,8 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             TARGET_CENTER = respawn_target(landmarks, w, h, TARGET_RADIUS)
             CURRENT_TYPE = choose_punch_type()
             print(CURRENT_TYPE, "<-----")
+            print(correct_by_type)
+            print(attempts_by_type)
             last_spawn_ts = now
             circle_spawn_ts = last_spawn_ts
             protect_release_ts = circle_spawn_ts + SPAWN_PROTECT_S
