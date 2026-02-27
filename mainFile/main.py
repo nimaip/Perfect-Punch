@@ -11,6 +11,7 @@ import json
 from datetime import datetime
 import math
 from defense import DefenseGame
+import ctypes
 
 class Model(nn.Module):
     def __init__(self, in_features=120, h1=128, h2=64, out_features=3):
@@ -187,6 +188,32 @@ def update_coverage_metrics(landmarks, w, h):
 start_time = time.time()
 cap = cv2.VideoCapture(0)
 
+# Create window and remove decorations (title bar, buttons) to make it non-movable
+WINDOW_NAME = "Mediapipe Feed (Press q to quit)"
+cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
+cv2.waitKey(1)  # Let the window initialize
+
+# Windows API constants
+GWL_STYLE = -16
+WS_CAPTION = 0x00C00000
+WS_THICKFRAME = 0x00040000
+WS_MINIMIZEBOX = 0x00020000
+WS_MAXIMIZEBOX = 0x00010000
+WS_SYSMENU = 0x00080000
+
+# Find the window handle and modify its style
+hwnd = ctypes.windll.user32.FindWindowW(None, WINDOW_NAME)
+if hwnd:
+    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU)
+    ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+    # Refresh the window to apply changes
+    SWP_FRAMECHANGED = 0x0020
+    SWP_NOMOVE = 0x0002
+    SWP_NOSIZE = 0x0001
+    SWP_NOZORDER = 0x0004
+    ctypes.windll.user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER)
+
 def get_frame():
     ret, frame = cap.read()
     return frame if ret else None
@@ -325,7 +352,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         defense_stats = defense_game.get_stats()
 
         display_image = cv2.flip(image, 1)
-        cv2.imshow("Mediapipe Feed (Press q to quit)", display_image)
+        cv2.imshow(WINDOW_NAME, display_image)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
